@@ -33,6 +33,7 @@
 .piece-5 {background-color: orange;}
 .piece-6 {background-color: blue;}
 .piece-7 {background-color: aqua;}
+.piece-8 {background-color: rgb(141, 141, 141);}
 
 .inPlace {
     border-bottom-color: rgb(0, 0, 0);

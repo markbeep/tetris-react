@@ -1,60 +1,15 @@
 import { useEffect } from "react";
 import { useState } from "react";
 import "./tetris.css";
+import { Piece, TetrisPiece } from "./pieces";
+import { HEIGHT, WIDTH, SLOW_TICK, FAST_TICK, QUEUE_BAGS } from "./constants";
 
-enum Piece {
-    None = 0,
-    OPiece,
-    SPiece,
-    ZPiece,
-    TPiece,
-    LPiece,
-    JPiece,
-    IPiece
-}
 
-const HEIGHT = 20;
-const WIDTH = 10;
-const SLOW_TICK = 5;
-const FAST_TICK = 10;
-const QUEUE_BAGS = 1;
-let currentPiece: TetrisPiece;
-let keyWasPressed = false;  // to allow us to slowly move tiles
-
-class TetrisPiece {
-    piece: Piece;
-    id: number;
-    y = 0;
-    x = 5;
-    grid = new Array(4).fill([]).map(e => new Array(4).fill(false));
-    constructor(piece: Piece, id: number) {
-        this.piece = piece;
-        this.id = id;
-    }
-    canMove(board: number[], dir = ""): boolean {
-        // puts all the block positions into an array so we can
-        // easily check if any of the blocks can't move
-        let blocks: number[] = [];
-        for (let i = 0; i < 4; i++) {
-            for (let j = 0; j < 4; j++) {
-                if (this.grid[i][j]) blocks.push((this.y + i) * WIDTH + this.x + j);
-            }
-        }
-
-        let canMoveDown = true;
-        let canMoveRight = true;
-        let canMoveLeft = true;
-        for (let i = 0; i < blocks.length; i++) {
-            let pos = blocks[i];
-            if (board[pos + WIDTH] !== 0) canMoveDown = false;
-            if (board[pos + 1] !== 0 || pos % WIDTH === (WIDTH - 1)) canMoveRight = false;
-            if (board[pos - 1] !== 0 || pos % WIDTH === 0) canMoveLeft = false;
-        }
-        if (dir === "l") return canMoveLeft;
-        if (dir === "r") return canMoveRight;
-        return canMoveDown;
-    }
-}
+let currentPiece: TetrisPiece | null = null;
+let leftWasPressed = false;
+let rightWasPressed = false;
+let upWasPressed = false;
+let fastMode = false;
 
 export default function Tetris() {
     const [board, setBoard] = useState<number[]>(new Array(WIDTH * HEIGHT).fill(0));
@@ -65,62 +20,70 @@ export default function Tetris() {
     const [gameOver, setGameOver] = useState(false);
 
     useEffect(() => {
+        // handle the key being down
         const keyPressHandler = (event: KeyboardEvent) => {
             let code = event.key;
-            if (keyWasPressed) return;
-            if (code == "ArrowUp") {
-                // up
-                console.log("up");
+            // if down arrow is pressed, keep going down
+            if (code === "ArrowDown") {
+                // down
+                fastMode = true;
             }
-            if (code == "ArrowRight") {
+            if (code == "ArrowUp" && !upWasPressed) {
+                // up
+                upWasPressed = true;
+                currentPiece?.rotateRight(board, pieceId, inPlace);
+            }
+            if (code == "ArrowRight" && !rightWasPressed) {
                 // right
-                console.log("right");
-                keyWasPressed = true;
-                setTimeout(() => keyWasPressed = false, 100);
+                rightWasPressed = true;
                 moveRight();
             }
-            if (code == "ArrowLeft") {
+            if (code == "ArrowLeft" && !leftWasPressed) {
                 // right
-                console.log("left");
-                keyWasPressed = true;
-                setTimeout(() => keyWasPressed = false, 100);
+                leftWasPressed = true;
                 moveLeft();
             }
         };
+
+        const keyReleaseHandler = (e: KeyboardEvent) => {
+            if (e.key === "ArrowDown") {
+                fastMode = false;
+            }
+            if (e.key === "ArrowUp") {
+                upWasPressed = false;
+            }
+            if (e.key === "ArrowLeft") {
+                leftWasPressed = false;
+            }
+            if (e.key === "ArrowRight") {
+                rightWasPressed = false;
+            }
+        };
+
+        // rest if the button is released
         document.addEventListener("keydown", keyPressHandler);
+        document.addEventListener("keyup", keyReleaseHandler)
 
         return () => {
             document.removeEventListener("keydown", keyPressHandler);
+            document.removeEventListener("keyup", keyReleaseHandler)
         };
 
     }, [pieceId, board]);
 
     useEffect(() => {
         if (gameOver) return;
-        setTimeout(() => setTick(e => e + 1), 50);
-        if (tick % SLOW_TICK === 0) {
-            let res = moveDown();
-            // nothing moved, so send new piece
-            if (!res.moved) {  // sets the new inPlaces
-                for (let i = 0; i < res.board.length; i++) {
-                    if (res.board[i] > 0) res.inPlace[i] = true;
-                }
-                setInPlace(res.inPlace);
-
-                // check if game is done (simply checks the top line)
-                for (let i = 0; i < 10; i++) {
-                    if (res.inPlace[i]) {
+        setTimeout(() => setTick(e => e + 1), 20);
+        if (tick % (fastMode ? FAST_TICK : SLOW_TICK) === 0) {
+            // the current piece has landed, send a new piece
+            if (!moveDown()) {
+                for (let i = 0; i < WIDTH; i++) {
+                    if (inPlace[i]) {
                         setGameOver(true);
                         return;
                     }
                 }
-
-                // send new piece
-                const tmpPiece = pieceQueue;
-                const piece = tmpPiece.shift();
-                if (piece === undefined) return;
-                setPieceQueue([...tmpPiece]);
-                addPiece(piece);
+                dropNewPiece();
             }
         }
     }, [tick, gameOver])
@@ -129,7 +92,6 @@ export default function Tetris() {
     useEffect(() => {
         if (pieceQueue.length < 7) {
             let tmp: Piece[] = new Array(QUEUE_BAGS * 7);
-            shuffle(tmp);
             let c = 0;
             for (let p = 1; p <= 7; p++) {
                 for (let i = 0; i < QUEUE_BAGS; i++) {
@@ -137,6 +99,7 @@ export default function Tetris() {
                     c++;
                 }
             }
+            shuffle(tmp);
             setPieceQueue([...pieceQueue, ...tmp]);
         }
     }, [pieceQueue]);
@@ -159,106 +122,43 @@ export default function Tetris() {
     //     setInPlace(tmpbool);
     // }, [])
 
-    // goes through the board and moves down all fields that can be moved down
-    const moveDown = (moveInPlace: boolean = false) => {
-        let tmpBoard = board;
-        let tmpPlace = inPlace;
-        let tmpId = pieceId;
-        let somethingMoved = false;
-        for (let i = tmpBoard.length - 1; i >= WIDTH; i--) {
-            if (tmpBoard[i] !== Piece.None) continue;  // this field isn't free, above can't be pushed down
-            let above = i - WIDTH;
-            if (tmpBoard[above] === Piece.None) continue; // the block we want to move is empty
-
-
-            if (!moveInPlace && tmpPlace[above]) continue;  // can't move inPlace blocks
-
-            if (!canMove(tmpId, above, tmpId[above])) continue;  // can't move this piece
-
-            // pull the above item down
-            tmpBoard[i] = tmpBoard[above];
-            tmpBoard[above] = 0;
-            tmpPlace[i] = tmpPlace[above];
-            tmpPlace[above] = false;
-            tmpId[i] = tmpId[above];
-            tmpId[above] = 0;
-            somethingMoved = true;
+    // moves the piece down by one block
+    const moveDown = () => {
+        if (currentPiece === null) return;  // there's currently no piece dropping
+        if (currentPiece.canMove(inPlace)) {
+            let tmp = currentPiece.moveDown(board, pieceId, inPlace);
+            setBoard([...tmp.board]);
+            return true;
         }
-        setBoard(tmpBoard);
-        // setInPlace(tmpPlace);
-        return { moved: somethingMoved, board: tmpBoard, inPlace: tmpPlace, id: tmpId };
+        let tmp = currentPiece.render(board, pieceId, inPlace, true);
+        setBoard([...tmp.board]);
+        setInPlace([...tmp.inPlace]);
+        setPieceId([...tmp.pieceId]);
+        currentPiece = null;
+        return false;
     };
 
     const moveRight = () => {
-        let canRight = true;
-        let tested = false;
-        for (let i = board.length - 1; i >= 0; i--) {
-            if (pieceId[i] === currentPieceId) {
-                if (!tested) {
-                    canRight = canMove(pieceId, i, currentPieceId, [], "r");
-                    tested = true;
-                }
-                if (!canRight) break;
-                pieceId[i + 1] = pieceId[i];
-                pieceId[i] = 0;
-                board[i + 1] = board[i];
-                board[i] = 0;
-            }
+        if (currentPiece === null) return;  // there's currently no piece dropping
+        if (currentPiece.canMove(inPlace, "r")) {
+            let tmp = currentPiece.moveRight(board, pieceId, inPlace);
+            setBoard([...tmp.board]);
         }
-        setPieceId([...pieceId]);
-        setBoard([...board]);
     };
 
     const moveLeft = () => {
-        let canLeft = true;
-        let tested = false;
-        for (let i = 0; i < board.length; i++) {
-            if (pieceId[i] === currentPieceId) {
-                if (!tested) {
-                    canLeft = canMove(pieceId, i, currentPieceId, [], "l");
-                    tested = true;
-                }
-                if (!canLeft) break;
-                pieceId[i - 1] = pieceId[i];
-                pieceId[i] = 0;
-                board[i - 1] = board[i];
-                board[i] = 0;
-            }
+        if (currentPiece === null) return;  // there's currently no piece dropping
+        if (currentPiece.canMove(inPlace, "l")) {
+            let tmp = currentPiece.moveLeft(board, pieceId, inPlace);
+            setBoard([...tmp.board]);
         }
-        setPieceId([...pieceId]);
-        setBoard([...board]);
     };
 
-    const setPiece = (board: number[], placed: boolean[], id: number[], positions: number[], piece: Piece) => {
-        const tid = tick;
-        for (let i = 0; i < positions.length; i++) {
-            let elem = positions[i];
-            board[elem] = piece;
-            placed[elem] = false;
-            id[elem] = tid;
-        }
-        return tid;
-    };
-
-    const addPiece = (id: Piece) => {
-        let tmp = board;
-        let placed = inPlace;
-        let tmpId = pieceId;
-        let positions = [0, 0, 0, 0];
-        if (id === Piece.OPiece) positions = [4, 5, 4 + WIDTH, 5 + WIDTH];
-        if (id === Piece.SPiece) positions = [5, 6, 4 + WIDTH, 5 + WIDTH];
-        if (id === Piece.ZPiece) positions = [3, 4, 4 + WIDTH, 5 + WIDTH];
-        if (id === Piece.TPiece) positions = [4, 3 + WIDTH, 4 + WIDTH, 5 + WIDTH];
-        if (id === Piece.LPiece) positions = [5, 3 + WIDTH, 4 + WIDTH, 5 + WIDTH];
-        if (id === Piece.JPiece) positions = [3, 3 + WIDTH, 4 + WIDTH, 5 + WIDTH];
-        if (id === Piece.IPiece) positions = [3, 4, 5, 6];
-
-
-        const tid = setPiece(tmp, placed, tmpId, positions, id);
-        setPieceId(tmpId);
-        setBoard(tmp);
-        setInPlace(placed);
-        currentPieceId = tid;
+    const dropNewPiece = () => {
+        const newPiece = pieceQueue.shift();
+        if (newPiece === undefined) return;
+        currentPiece = new TetrisPiece(newPiece, tick);
+        setPieceQueue([...pieceQueue]);
     };
 
     return (
@@ -269,28 +169,6 @@ export default function Tetris() {
         </div>
     );
 };
-
-// determines if a piece can be moved down
-function canMove(boardId: number[], pos: number, id: number, vis: number[] = [], dir = ""): boolean {
-    if (vis.includes(pos)) return true;
-
-    let tmpVis = [...vis, pos];
-
-    // check left
-    let leftCanMove = (dir === "l")
-        ? (boardId[pos - 1] === id) ? canMove(boardId, pos - 1, id, tmpVis, dir) : (pos - 1) % WIDTH !== (WIDTH - 1) && boardId[pos - 1] === 0
-        : (boardId[pos - 1] !== id) ? true : canMove(boardId, pos - 1, id, tmpVis, dir);
-
-    // check right
-    let rightCanMove = (dir === "r")
-        ? (boardId[pos + 1] === id) ? canMove(boardId, pos + 1, id, tmpVis, dir) : (pos + 1) % WIDTH !== 0 && boardId[pos + 1] === 0
-        : (boardId[pos + 1] !== id) ? true : canMove(boardId, pos + 1, id, tmpVis, dir);
-
-    let topCanMove = (boardId[pos - WIDTH] !== id) ? true : canMove(boardId, pos - WIDTH, id, tmpVis, dir);
-    let botCanMove = [0, undefined].includes(boardId[pos + WIDTH]) || (boardId[pos + WIDTH] === id && canMove(boardId, pos + WIDTH, id, tmpVis, dir));
-
-    return leftCanMove && rightCanMove && topCanMove && botCanMove;
-}
 
 // shuffles an array
 function shuffle(array: number[]) {
