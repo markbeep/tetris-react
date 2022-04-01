@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useState } from "react";
 import "./tetris.css";
-import { Piece, TetrisPiece } from "./pieces";
+import { getPiece, Piece, TetrisPiece } from "./pieces";
 import { HEIGHT, WIDTH, SLOW_TICK, FAST_TICK, QUEUE_BAGS, WAIT_BEFORE_SET } from "./constants";
 
 
@@ -15,44 +15,44 @@ let hardDropHappened = false;
 
 let currentBoard: number[] = new Array(WIDTH * HEIGHT).fill(0);
 let currentInPlace: boolean[] = new Array(WIDTH * HEIGHT).fill(false);
-let currentPieceId: number[] = new Array(WIDTH * HEIGHT).fill(0);
 
 export default function Tetris() {
     const [board, setBoard] = useState<number[]>(new Array(WIDTH * HEIGHT).fill(0));
     const [inPlace, setInPlace] = useState(new Array(WIDTH * HEIGHT).fill(false));
     const [tick, setTick] = useState(1);
-    const [pieceId, setPieceId] = useState(new Array(WIDTH * HEIGHT).fill(0));
     const [pieceQueue, setPieceQueue] = useState<Piece[]>(shuffle([1, 2, 3, 4, 5, 6, 7]));
     const [gameOver, setGameOver] = useState(false);
+    const [score, setScore] = useState(0);
 
     const renderFrame = () => {
         setBoard(currentBoard);
         setInPlace(currentInPlace);
-        setPieceId(currentPieceId);
     }
 
+    // handles key presses
     useEffect(() => {
         // handle the key being down
         const keyPressHandler = (event: KeyboardEvent) => {
             let code = event.key;
+            if (hardDropHappened) return;
             // if down arrow is pressed, keep going down
             if (code === "ArrowDown") {
                 // down
                 fastMode = true;
             }
             const keyCooldown = 100;
-            if (code == "ArrowUp" && !upWasPressed) {
+            if (code === "ArrowUp" && !upWasPressed) {
                 // up
                 upWasPressed = true;
-                currentPiece?.rotateRight(currentBoard, currentPieceId, currentInPlace);
+                currentPiece?.rotateRight(currentBoard, currentInPlace);
             }
-            if (code == "ArrowRight" && !rightWasPressed) {
+            if (code === "ArrowRight" && !rightWasPressed) {
                 // right
                 rightWasPressed = true;
                 setTimeout(() => rightWasPressed = false, keyCooldown);
                 moveRight();
             }
-            if (code == "ArrowLeft" && !leftWasPressed) {
+            if (code === "ArrowLeft" && !leftWasPressed) {
                 // right
                 leftWasPressed = true;
                 setTimeout(() => leftWasPressed = false, keyCooldown);
@@ -62,10 +62,9 @@ export default function Tetris() {
                 if (currentPiece === null) return;
                 hardDropHappened = true;
                 spaceWasPressed = true;
-                let tmp = currentPiece.hardDrop(currentBoard, currentPieceId, currentInPlace);
-                currentPiece = null;
+                let tmp = currentPiece.hardDrop(currentBoard, currentInPlace);
+                // dropNewPiece();
                 currentBoard = tmp.board;
-                currentPieceId = tmp.pieceId;
                 currentInPlace = tmp.inPlace;
                 renderFrame();
             }
@@ -98,11 +97,13 @@ export default function Tetris() {
             document.removeEventListener("keyup", keyReleaseHandler)
         };
 
-    }, [currentPieceId, currentBoard]);
+    }, []);
 
+    // handles the game ticks
     useEffect(() => {
         if (gameOver) return;
         setTimeout(() => setTick(e => e + 1), 20);
+        if (currentPiece === null) dropNewPiece();
         if (tick % (fastMode ? FAST_TICK : SLOW_TICK) === 0) {
             // the current piece has landed, send a new piece
             if (!moveDown() || hardDropHappened) {
@@ -116,20 +117,26 @@ export default function Tetris() {
                 }
                 // checks if a line is to be removed
                 let linesToRemove: number[] = [];
+                console.log("Checking for finished rows")
                 for (let y = 0; y < HEIGHT; y++) {
                     let count = 0;
                     for (let x = 0; x < WIDTH; x++) {
                         if (inPlace[y * WIDTH + x]) count++;
                     }
+                    // if (count === 0) break;
                     if (count === WIDTH) linesToRemove.push(y);
                 }
-                removeLines(linesToRemove);
+                console.log(`Found ${linesToRemove.length} rows to remove`)
 
-                dropNewPiece();
+                let n = linesToRemove.length;
+                if (n > 0) {
+                    removeLines(linesToRemove);
+                    setScore(s => s + getScore(n));
+                }
             }
             renderFrame();
         }
-    }, [tick, gameOver])
+    }, [tick, gameOver]);
 
     // updates the piece queue to always have at least 7 pieces in it
     useEffect(() => {
@@ -147,36 +154,17 @@ export default function Tetris() {
         }
     }, [pieceQueue]);
 
-    // useEffect(() => {
-    //     let tmp = new Array(WIDTH * HEIGHT).fill(0);
-    //     let tmpId = new Array(WIDTH * HEIGHT).fill(0);
-    //     let tmpbool = new Array(WIDTH * HEIGHT).fill(false);
-    //     tmp[114] = tmp[115] = tmp[124] = tmp[125] = Piece.OPiece;
-    //     tmpId[114] = tmpId[115] = tmpId[124] = tmpId[125] = 2;
-    //     tmpbool[114] = tmpbool[115] = tmpbool[124] = tmpbool[125] = true;
-
-    //     tmp[104] = tmp[105] = tmp[106] = tmp[95] = Piece.TPiece;
-    //     tmpId[104] = tmpId[105] = tmpId[106] = tmpId[95] = 3;
-    //     tmpbool[104] = tmpbool[105] = tmpbool[106] = tmpbool[95] = false;
-
-    //     console.log(canMove(tmpId, 106, 3));
-    //     setBoard(tmp);
-    //     setPieceId(tmpId);
-    //     setInPlace(tmpbool);
-    // }, [])
-
     // moves the piece down by one block
     const moveDown = () => {
         if (currentPiece === null) return;  // there's currently no piece dropping
         if (currentPiece.canMove(currentInPlace)) {
-            let tmp = currentPiece.moveDown(currentBoard, currentPieceId, currentInPlace);
+            let tmp = currentPiece.moveDown(currentBoard, currentInPlace);
             currentBoard = tmp.board;
             return true;
         }
-        let tmp = currentPiece.render(currentBoard, currentPieceId, currentInPlace, true);
+        let tmp = currentPiece.render(currentBoard, currentInPlace, true);
         currentBoard = tmp.board;
         currentInPlace = tmp.inPlace;
-        currentPieceId = tmp.pieceId;
         currentPiece = null;
         return false;
     };
@@ -184,7 +172,7 @@ export default function Tetris() {
     const moveRight = () => {
         if (currentPiece === null) return;  // there's currently no piece dropping
         if (currentPiece.canMove(currentInPlace, "r")) {
-            let tmp = currentPiece.moveRight(currentBoard, currentPieceId, currentInPlace);
+            let tmp = currentPiece.moveRight(currentBoard, currentInPlace);
             currentBoard = tmp.board;
         }
     };
@@ -192,7 +180,7 @@ export default function Tetris() {
     const moveLeft = () => {
         if (currentPiece === null) return;  // there's currently no piece dropping
         if (currentPiece.canMove(currentInPlace, "l")) {
-            let tmp = currentPiece.moveLeft(currentBoard, currentPieceId, currentInPlace);
+            let tmp = currentPiece.moveLeft(currentBoard, currentInPlace);
             currentBoard = tmp.board;
         }
     };
@@ -201,17 +189,34 @@ export default function Tetris() {
         const newPiece = pieceQueue.shift();
         if (newPiece === undefined) return;
         currentPiece = new TetrisPiece(newPiece, tick);
+        currentBoard = currentPiece.render(currentBoard, inPlace).board;
         setPieceQueue([...pieceQueue]);
         renderFrame();
     };
 
     return (
-        <div className="window">
-            <div className="gameBoard">
-                {board.slice(0, 200).map((e, i) => <div className={`piece piece-${e} ${inPlace[i] ? "inPlace" : ""}`}></div>)}
+        <div className="container">
+            <div className="scoreField">
+                <h3>{score}</h3>
             </div>
-            <div className="upcoming">
-                {pieceQueue.slice(0, 4).map(e => <div>Hello</div>)}
+            <div className="window">
+                <div className="gameBoard">
+                    {board.slice(0, 200).map((e, i) => <div className={`piece piece-${e} ${inPlace[i] ? "inPlace" : ""}`}></div>)}
+                </div>
+                <div className="upcoming">
+                    <h3>Upcoming</h3>
+                    {pieceQueue
+                        .slice(0, 4)
+                        .map(pieceId => {
+                            let queueGrid = getPiece(pieceId, 0).flat();
+                            return (
+                                <div className="upcomingField">
+                                    {queueGrid.map(exists => <div className={`piece ${exists ? `piece-${pieceId}` : ""}`}></div>)}
+                                </div>
+                            );
+                        })
+                    }
+                </div>
             </div>
         </div>
     );
@@ -234,23 +239,29 @@ function shuffle(array: number[]) {
 }
 
 function removeLines(linesToRemove: number[]) {
-    let n = linesToRemove.length;
-    if (n === 0) return;
-    let sorted = linesToRemove.sort((a, b) => b - a);  // greater y first
+    let sorted = linesToRemove.sort((a, b) => a - b);  // greater y first
     for (let startY of sorted) {
         for (let y = startY; y >= 0; y--) {
             for (let x = 0; x < WIDTH; x++) {
                 const pos = y * WIDTH + x;
                 const above = (y - 1) * WIDTH + x;
                 currentBoard[pos] = currentBoard[above] || 0;
-                currentPieceId[pos] = currentPieceId[above] || 0;
                 currentInPlace[pos] = currentInPlace[above] || false;
                 if (above > 0) {
                     currentBoard[above] = 0;
-                    currentPieceId[above] = 0;
                     currentInPlace[above] = false;
                 }
             }
         }
+    }
+}
+
+function getScore(linesCleared: number, level = 0) {
+    switch (linesCleared) {
+        case 1: return 40 * (level + 1);
+        case 2: return 100 * (level + 1);
+        case 3: return 300 * (level + 1);
+        case 4: return 1200 * (level + 1);
+        default: return 0;
     }
 }

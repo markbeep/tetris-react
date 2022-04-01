@@ -186,7 +186,7 @@ const TPIECE = [
 
 const inOrder = [OPIECE, SPIECE, ZPIECE, TPIECE, LPIECE, JPIECE, IPIECE]
 
-function getPiece(piece: Piece, rotation: 0 | 1 | 2 | 3 = 0) {
+function getPiece(piece: Piece, rotation: number = 0) {
     if (piece === Piece.OPiece) rotation = 0;
     return inOrder[piece - 1][rotation].map(e => e.map(Boolean));
 }
@@ -196,7 +196,7 @@ class TetrisPiece {
     id: number;
     y = 0;
     x = 5;
-    rotation: 0 | 1 | 2 | 3 = 0;
+    rotation: number = 0;
     lastFramePos: number[] = [];  // to know what was "colored" last frame
     lastOutlinePos: number[] = [];
 
@@ -230,8 +230,7 @@ class TetrisPiece {
         if (dir === "r") return canMoveRight;
         return canMoveDown;
     }
-    render(board: number[], pieceId: number[], inPlace: boolean[], setPiece = false): { board: number[], pieceId: number[], inPlace: boolean[] } {
-        const addId = setPiece && pieceId.length > 0;
+    render(board: number[], inPlace: boolean[], setPiece = false): { board: number[], inPlace: boolean[] } {
         const addInPlace = setPiece && inPlace.length > 0;
         const grid = getPiece(this.piece, this.rotation);
         // clean up the board from the previous frame
@@ -242,46 +241,60 @@ class TetrisPiece {
 
         board = this.getOutline(board, inPlace);
 
-        console.log(this.y);
-
         for (let i = 0; i < 4; i++) {
             for (let j = 0; j < 4; j++) {
                 if (!grid[i][j]) continue;
                 let pos = (this.y + i) * WIDTH + j + this.x;
                 board[pos] = this.piece;
-                if (addId) pieceId[pos] = this.id;
                 if (addInPlace) inPlace[pos] = true;
                 this.lastFramePos.push(pos);
             }
         }
 
-        return { board, pieceId, inPlace };
+        return { board, inPlace };
     }
-    moveDown(board: number[], pieceId: number[], inPlace: boolean[],) {
+    moveDown(board: number[], inPlace: boolean[],) {
         this.y++;
-        return this.render(board, pieceId, inPlace);
+        return this.render(board, inPlace);
     }
-    moveRight(board: number[], pieceId: number[], inPlace: boolean[]) {
+    moveRight(board: number[], inPlace: boolean[]) {
         this.x++;
-        return this.render(board, pieceId, inPlace);
+        return this.render(board, inPlace);
     }
-    moveLeft(board: number[], pieceId: number[], inPlace: boolean[]) {
+    moveLeft(board: number[], inPlace: boolean[]) {
         this.x--;
-        return this.render(board, pieceId, inPlace);
+        return this.render(board, inPlace);
     }
-    rotateRight(board: number[], pieceId: number[], inPlace: boolean[]) {
-        this.rotation++;
-        if (this.rotation > 3) this.rotation = 0;
-        return this.render(board, pieceId, inPlace);
+    rotateRight(board: number[], inPlace: boolean[]) {
+        let newRotation = (this.rotation + 1) % 4;
+        const rotated_grid = getPiece(this.piece, newRotation);
+        let pieceIsLeft = this.x < WIDTH / 2;
+        for (let i = 0; i < rotated_grid.length; i++) {
+            for (let j = 0; j < rotated_grid[0].length; j++) {
+                if (!rotated_grid[i][j]) continue;
+                let pos = (this.y + i) * WIDTH + this.x + j;
+                let local_x = pos % WIDTH;
+                // if its not possible to rotate because of another piece
+                if (inPlace[pos]) return { board: board, inPlace: inPlace };
+                // can't rotate piece out of bounds on the floor
+                if (pos >= (HEIGHT * WIDTH)) return { board: board, inPlace: inPlace };
+                // can't rotate the piece if it splits the piece
+                if (pieceIsLeft && local_x === WIDTH - 1) return { board: board, inPlace: inPlace };
+                if (!pieceIsLeft && local_x === 0) return { board: board, inPlace: inPlace };
+            }
+        }
+
+        this.rotation = newRotation;
+        return this.render(board, inPlace);
     }
-    rotateLeft(board: number[], pieceId: number[], inPlace: boolean[]) {
+    rotateLeft(board: number[], inPlace: boolean[]) {
         this.rotation--;
         if (this.rotation < 0) this.rotation = 3;
-        return this.render(board, pieceId, inPlace);
+        return this.render(board, inPlace);
     }
-    hardDrop(board: number[], pieceId: number[], inPlace: boolean[]) {
+    hardDrop(board: number[], inPlace: boolean[]) {
         this.y = this._getLowestY(inPlace);
-        return this.render(board, pieceId, inPlace, true);
+        return this.render(board, inPlace, true);
     }
     _getLowestY(inPlace: boolean[]) {
         let lowestY = this.y;
