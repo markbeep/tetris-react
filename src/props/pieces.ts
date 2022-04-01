@@ -187,6 +187,14 @@ const TPIECE = [
 const inOrder = [OPIECE, SPIECE, ZPIECE, TPIECE, LPIECE, JPIECE, IPIECE]
 
 function getPiece(piece: Piece, rotation: number = 0) {
+    if (piece === Piece.None) {
+        return [
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0],
+            [0, 0, 0, 0]
+        ];
+    }
     if (piece === Piece.OPiece) rotation = 0;
     return inOrder[piece - 1][rotation].map(e => e.map(Boolean));
 }

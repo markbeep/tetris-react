@@ -23,6 +23,7 @@ export default function Tetris() {
     const [pieceQueue, setPieceQueue] = useState<Piece[]>(shuffle([1, 2, 3, 4, 5, 6, 7]));
     const [gameOver, setGameOver] = useState(false);
     const [score, setScore] = useState(0);
+    const [holdingPiece, setHoldingPiece] = useState<Piece>(0);
 
     const renderFrame = () => {
         setBoard(currentBoard);
@@ -203,19 +204,26 @@ export default function Tetris() {
                 <div className="gameBoard">
                     {board.slice(0, 200).map((e, i) => <div className={`piece piece-${e} ${inPlace[i] ? "inPlace" : ""}`}></div>)}
                 </div>
-                <div className="upcoming">
-                    <h3>Upcoming</h3>
-                    {pieceQueue
-                        .slice(0, 4)
-                        .map(pieceId => {
-                            let queueGrid = getPiece(pieceId, 0).flat();
-                            return (
-                                <div className="upcomingField">
-                                    {queueGrid.map(exists => <div className={`piece ${exists ? `piece-${pieceId}` : ""}`}></div>)}
-                                </div>
-                            );
-                        })
-                    }
+                <div className="extras">
+                    <h3>Hold</h3>
+                    <div className="upcomingField">
+                        {getPiece(holdingPiece, 0).flat().map(e => <div className={`piece ${e ? `piece-${holdingPiece}` : ""}`}></div>)}
+                    </div>
+                    <div className="upcoming">
+                        <h3>Upcoming</h3>
+                        {pieceQueue
+                            .slice(0, 4)
+                            .map(pieceId => {
+                                let queueGrid = getPiece(pieceId, 0).flat();
+                                return (
+                                    <div className="upcomingField">
+                                        {queueGrid.map(exists => <div className={`piece ${exists ? `piece-${pieceId}` : ""}`}></div>)}
+                                    </div>
+                                );
+                            })
+                        }
+                    </div>
+
                 </div>
             </div>
         </div>

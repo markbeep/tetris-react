@@ -3,7 +3,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    height: 600px;
+    height: 700px;
     width: 400px;
     background-color: gray;
     margin: 5%;
@@ -25,7 +25,6 @@
 .gameBoard {
     position: relative;
     display: grid;
-    background-color: black;
     grid-template-columns: repeat(10, 26px);
     grid-template-rows: repeat(20, 26px);
 }
