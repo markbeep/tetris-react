@@ -2,14 +2,20 @@ import { useEffect } from "react";
 import { useState } from "react";
 import "./tetris.css";
 import { Piece, TetrisPiece } from "./pieces";
-import { HEIGHT, WIDTH, SLOW_TICK, FAST_TICK, QUEUE_BAGS } from "./constants";
+import { HEIGHT, WIDTH, SLOW_TICK, FAST_TICK, QUEUE_BAGS, WAIT_BEFORE_SET } from "./constants";
 
 
 let currentPiece: TetrisPiece | null = null;
 let leftWasPressed = false;
 let rightWasPressed = false;
 let upWasPressed = false;
+let spaceWasPressed = false;
 let fastMode = false;
+let hardDropHappened = false;
+
+let currentBoard: number[] = new Array(WIDTH * HEIGHT).fill(0);
+let currentInPlace: boolean[] = new Array(WIDTH * HEIGHT).fill(false);
+let currentPieceId: number[] = new Array(WIDTH * HEIGHT).fill(0);
 
 export default function Tetris() {
     const [board, setBoard] = useState<number[]>(new Array(WIDTH * HEIGHT).fill(0));
@@ -18,6 +24,12 @@ export default function Tetris() {
     const [pieceId, setPieceId] = useState(new Array(WIDTH * HEIGHT).fill(0));
     const [pieceQueue, setPieceQueue] = useState<Piece[]>(shuffle([1, 2, 3, 4, 5, 6, 7]));
     const [gameOver, setGameOver] = useState(false);
+
+    const renderFrame = () => {
+        setBoard(currentBoard);
+        setInPlace(currentInPlace);
+        setPieceId(currentPieceId);
+    }
 
     useEffect(() => {
         // handle the key being down
@@ -28,20 +40,34 @@ export default function Tetris() {
                 // down
                 fastMode = true;
             }
+            const keyCooldown = 100;
             if (code == "ArrowUp" && !upWasPressed) {
                 // up
                 upWasPressed = true;
-                currentPiece?.rotateRight(board, pieceId, inPlace);
+                currentPiece?.rotateRight(currentBoard, currentPieceId, currentInPlace);
             }
             if (code == "ArrowRight" && !rightWasPressed) {
                 // right
                 rightWasPressed = true;
+                setTimeout(() => rightWasPressed = false, keyCooldown);
                 moveRight();
             }
             if (code == "ArrowLeft" && !leftWasPressed) {
                 // right
                 leftWasPressed = true;
+                setTimeout(() => leftWasPressed = false, keyCooldown);
                 moveLeft();
+            }
+            if (code === " " && !spaceWasPressed) {
+                if (currentPiece === null) return;
+                hardDropHappened = true;
+                spaceWasPressed = true;
+                let tmp = currentPiece.hardDrop(currentBoard, currentPieceId, currentInPlace);
+                currentPiece = null;
+                currentBoard = tmp.board;
+                currentPieceId = tmp.pieceId;
+                currentInPlace = tmp.inPlace;
+                renderFrame();
             }
         };
 
@@ -58,6 +84,9 @@ export default function Tetris() {
             if (e.key === "ArrowRight") {
                 rightWasPressed = false;
             }
+            if (e.key === " ") {
+                spaceWasPressed = false;
+            }
         };
 
         // rest if the button is released
@@ -69,22 +98,36 @@ export default function Tetris() {
             document.removeEventListener("keyup", keyReleaseHandler)
         };
 
-    }, [pieceId, board]);
+    }, [currentPieceId, currentBoard]);
 
     useEffect(() => {
         if (gameOver) return;
         setTimeout(() => setTick(e => e + 1), 20);
         if (tick % (fastMode ? FAST_TICK : SLOW_TICK) === 0) {
             // the current piece has landed, send a new piece
-            if (!moveDown()) {
+            if (!moveDown() || hardDropHappened) {
+                // checks if we lost
+                hardDropHappened = false;
                 for (let i = 0; i < WIDTH; i++) {
-                    if (inPlace[i]) {
+                    if (currentInPlace[i]) {
                         setGameOver(true);
                         return;
                     }
                 }
+                // checks if a line is to be removed
+                let linesToRemove: number[] = [];
+                for (let y = 0; y < HEIGHT; y++) {
+                    let count = 0;
+                    for (let x = 0; x < WIDTH; x++) {
+                        if (inPlace[y * WIDTH + x]) count++;
+                    }
+                    if (count === WIDTH) linesToRemove.push(y);
+                }
+                removeLines(linesToRemove);
+
                 dropNewPiece();
             }
+            renderFrame();
         }
     }, [tick, gameOver])
 
@@ -125,32 +168,32 @@ export default function Tetris() {
     // moves the piece down by one block
     const moveDown = () => {
         if (currentPiece === null) return;  // there's currently no piece dropping
-        if (currentPiece.canMove(inPlace)) {
-            let tmp = currentPiece.moveDown(board, pieceId, inPlace);
-            setBoard([...tmp.board]);
+        if (currentPiece.canMove(currentInPlace)) {
+            let tmp = currentPiece.moveDown(currentBoard, currentPieceId, currentInPlace);
+            currentBoard = tmp.board;
             return true;
         }
-        let tmp = currentPiece.render(board, pieceId, inPlace, true);
-        setBoard([...tmp.board]);
-        setInPlace([...tmp.inPlace]);
-        setPieceId([...tmp.pieceId]);
+        let tmp = currentPiece.render(currentBoard, currentPieceId, currentInPlace, true);
+        currentBoard = tmp.board;
+        currentInPlace = tmp.inPlace;
+        currentPieceId = tmp.pieceId;
         currentPiece = null;
         return false;
     };
 
     const moveRight = () => {
         if (currentPiece === null) return;  // there's currently no piece dropping
-        if (currentPiece.canMove(inPlace, "r")) {
-            let tmp = currentPiece.moveRight(board, pieceId, inPlace);
-            setBoard([...tmp.board]);
+        if (currentPiece.canMove(currentInPlace, "r")) {
+            let tmp = currentPiece.moveRight(currentBoard, currentPieceId, currentInPlace);
+            currentBoard = tmp.board;
         }
     };
 
     const moveLeft = () => {
         if (currentPiece === null) return;  // there's currently no piece dropping
-        if (currentPiece.canMove(inPlace, "l")) {
-            let tmp = currentPiece.moveLeft(board, pieceId, inPlace);
-            setBoard([...tmp.board]);
+        if (currentPiece.canMove(currentInPlace, "l")) {
+            let tmp = currentPiece.moveLeft(currentBoard, currentPieceId, currentInPlace);
+            currentBoard = tmp.board;
         }
     };
 
@@ -159,12 +202,16 @@ export default function Tetris() {
         if (newPiece === undefined) return;
         currentPiece = new TetrisPiece(newPiece, tick);
         setPieceQueue([...pieceQueue]);
+        renderFrame();
     };
 
     return (
         <div className="window">
             <div className="gameBoard">
-                {board.filter((_, i) => i < 200).map((e, i) => <div className={`piece piece-${e} ${inPlace[i] ? "inPlace" : ""}`}></div>)}
+                {board.slice(0, 200).map((e, i) => <div className={`piece piece-${e} ${inPlace[i] ? "inPlace" : ""}`}></div>)}
+            </div>
+            <div className="upcoming">
+                {pieceQueue.slice(0, 4).map(e => <div>Hello</div>)}
             </div>
         </div>
     );
@@ -184,4 +231,26 @@ function shuffle(array: number[]) {
         array[index] = tmp;
     }
     return array;
+}
+
+function removeLines(linesToRemove: number[]) {
+    let n = linesToRemove.length;
+    if (n === 0) return;
+    let sorted = linesToRemove.sort((a, b) => b - a);  // greater y first
+    for (let startY of sorted) {
+        for (let y = startY; y >= 0; y--) {
+            for (let x = 0; x < WIDTH; x++) {
+                const pos = y * WIDTH + x;
+                const above = (y - 1) * WIDTH + x;
+                currentBoard[pos] = currentBoard[above] || 0;
+                currentPieceId[pos] = currentPieceId[above] || 0;
+                currentInPlace[pos] = currentInPlace[above] || false;
+                if (above > 0) {
+                    currentBoard[above] = 0;
+                    currentPieceId[above] = 0;
+                    currentInPlace[above] = false;
+                }
+            }
+        }
+    }
 }

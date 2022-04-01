@@ -230,7 +230,7 @@ class TetrisPiece {
         if (dir === "r") return canMoveRight;
         return canMoveDown;
     }
-    render(board: number[], pieceId: number[], inPlace: boolean[], setPiece = false) {
+    render(board: number[], pieceId: number[], inPlace: boolean[], setPiece = false): { board: number[], pieceId: number[], inPlace: boolean[] } {
         const addId = setPiece && pieceId.length > 0;
         const addInPlace = setPiece && inPlace.length > 0;
         const grid = getPiece(this.piece, this.rotation);
@@ -241,6 +241,8 @@ class TetrisPiece {
         this.lastFramePos = [];
 
         board = this.getOutline(board, inPlace);
+
+        console.log(this.y);
 
         for (let i = 0; i < 4; i++) {
             for (let j = 0; j < 4; j++) {
@@ -277,16 +279,23 @@ class TetrisPiece {
         if (this.rotation < 0) this.rotation = 3;
         return this.render(board, pieceId, inPlace);
     }
-    getOutline(board: number[], inPlace: boolean[]) {
-        // find the lowest y that we can still place the block
+    hardDrop(board: number[], pieceId: number[], inPlace: boolean[]) {
+        this.y = this._getLowestY(inPlace);
+        return this.render(board, pieceId, inPlace, true);
+    }
+    _getLowestY(inPlace: boolean[]) {
         let lowestY = this.y;
         for (; lowestY < HEIGHT; lowestY++) {
             let res = this.canMove(inPlace, "", lowestY);
             if (!res) {
-                console.log(res, lowestY);
                 break;
             }
         }
+        return lowestY;
+    }
+    getOutline(board: number[], inPlace: boolean[]) {
+        // find the lowest y that we can still place the block
+        let lowestY = this._getLowestY(inPlace);
 
         const grid = getPiece(this.piece, this.rotation);
         // clean up the board from the previous frame
