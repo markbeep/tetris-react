@@ -238,7 +238,7 @@ class TetrisPiece {
         if (dir === "r") return canMoveRight;
         return canMoveDown;
     }
-    render(board: number[], inPlace: boolean[], setPiece = false): { board: number[], inPlace: boolean[] } {
+    render(board: number[], inPlace: boolean[], setPiece = false, withoutPiece = false): { board: number[], inPlace: boolean[] } {
         const addInPlace = setPiece && inPlace.length > 0;
         const grid = getPiece(this.piece, this.rotation);
         // clean up the board from the previous frame
@@ -247,15 +247,17 @@ class TetrisPiece {
         }
         this.lastFramePos = [];
 
-        board = this.getOutline(board, inPlace);
+        board = this.getOutline(board, inPlace, withoutPiece);
 
-        for (let i = 0; i < 4; i++) {
-            for (let j = 0; j < 4; j++) {
-                if (!grid[i][j]) continue;
-                let pos = (this.y + i) * WIDTH + j + this.x;
-                board[pos] = this.piece;
-                if (addInPlace) inPlace[pos] = true;
-                this.lastFramePos.push(pos);
+        if (!withoutPiece) {
+            for (let i = 0; i < 4; i++) {
+                for (let j = 0; j < 4; j++) {
+                    if (!grid[i][j]) continue;
+                    let pos = (this.y + i) * WIDTH + j + this.x;
+                    board[pos] = this.piece;
+                    if (addInPlace) inPlace[pos] = true;
+                    this.lastFramePos.push(pos);
+                }
             }
         }
 
@@ -314,10 +316,10 @@ class TetrisPiece {
         }
         return lowestY;
     }
-    getOutline(board: number[], inPlace: boolean[]) {
+    getOutline(board: number[], inPlace: boolean[], withoutPiece = false) {
         // find the lowest y that we can still place the block
         let lowestY = this._getLowestY(inPlace);
-
+        console.log(lowestY);
         const grid = getPiece(this.piece, this.rotation);
         // clean up the board from the previous frame
         for (let e of this.lastOutlinePos) {
@@ -325,12 +327,14 @@ class TetrisPiece {
         }
         this.lastOutlinePos = [];
 
-        for (let i = 0; i < 4; i++) {
-            for (let j = 0; j < 4; j++) {
-                if (!grid[i][j]) continue;
-                let pos = (lowestY + i) * WIDTH + j + this.x;
-                board[pos] = Piece.Outline;
-                this.lastOutlinePos.push(pos);
+        if (!withoutPiece) {
+            for (let i = 0; i < 4; i++) {
+                for (let j = 0; j < 4; j++) {
+                    if (!grid[i][j]) continue;
+                    let pos = (lowestY + i) * WIDTH + j + this.x;
+                    board[pos] = Piece.Outline;
+                    this.lastOutlinePos.push(pos);
+                }
             }
         }
         return board;

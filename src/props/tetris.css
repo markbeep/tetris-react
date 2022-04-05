@@ -1,3 +1,7 @@
+body {
+    background-color: #1B1B1E;
+}
+
 .container {
     display: flex;
     flex-direction: column;
@@ -5,7 +9,7 @@
     justify-content: center;
     height: 700px;
     width: 400px;
-    background-color: gray;
+    background-color: #1B1B1E;
     margin: 5%;
     padding: 5px;
 }
@@ -16,10 +20,18 @@
 }
 
 .scoreField {
-    background-color: green;
+    position: relative;
+    background-color: #373F51;
+    color: #58A4B0;
     width: 80px;
     margin-bottom: 10px;
+    border: 3px solid;
     border-radius: 10px;
+    border-top-color: rgba(255,255,255,0.5);
+    border-left-color: rgba(255,255,255,0.5);
+    border-bottom-color: rgba(0,0,0,0.6);
+    border-right-color: rgba(0,0,0,0.6);
+    left: -50px;
 }
 
 .gameBoard {
@@ -29,15 +41,22 @@
     grid-template-rows: repeat(20, 26px);
 }
 
-.piece {
-    height: 20px;
-    width: 20px;
-    background-color: rgb(214, 214, 214);
-    border: 3px solid white;
-    border-bottom-color: #444;
-    border-right-color: #444;
-    border-top-color: rgb(173, 173, 173);
-    border-left-color: rgb(173, 173, 173);
+.box {
+    height: 25px;
+    width: 25px;
+    background-color: #373F51;
+    border: 1px solid #58A4B0;
+}
+
+.piece-1,.piece-2,.piece-3,.piece-4,.piece-5,.piece-6,.piece-7,.piece-8 {
+    height: 22px;
+    width: 22px;
+    border-width: 3px;
+    border-top-color: rgba(255,255,255,0.5);
+    border-left-color: rgba(255,255,255,0.5);
+    border-bottom-color: rgba(0,0,0,0.6);
+    border-right-color: rgba(0,0,0,0.6);
+    border-radius: 5px;
 }
 
 .piece-1 {
@@ -73,15 +92,21 @@
 }
 
 .inPlace {
-    border-bottom-color: rgb(0, 0, 0);
-    border-right-color: rgb(0, 0, 0);
-    border-top-color: rgb(100, 100, 100);
-    border-left-color: rgb(100, 100, 100);
-    /* background-color: red; */
+    height: 22px;
+    width: 22px;
+    border-width: 3px;
+    border-top-color: rgba(255,255,255,0.8);
+    border-left-color: rgba(255,255,255,0.8);
+    border-bottom-color: rgba(0,0,0,0.8);
+    border-right-color: rgba(0,0,0,0.8);
 }
 
 .upcoming {
     margin: 5px;
+}
+
+.hold {
+    margin-left: 5px;
 }
 
 .upcomingField {
@@ -89,4 +114,13 @@
     display: grid;
     grid-template-columns: repeat(4, 26px);
     grid-template-rows: repeat(4, 26px);
+}
+
+.extras h3 {
+    color: #58A4B0;
+}
+
+.extras {
+    position: relative;
+    top: -90px;
 }

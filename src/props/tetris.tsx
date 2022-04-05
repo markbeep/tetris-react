@@ -6,10 +6,12 @@ import { HEIGHT, WIDTH, SLOW_TICK, FAST_TICK, QUEUE_BAGS, WAIT_BEFORE_SET } from
 
 
 let currentPiece: TetrisPiece | null = null;
+let holdingPiece: Piece = Piece.None;
 let leftWasPressed = false;
 let rightWasPressed = false;
 let upWasPressed = false;
 let spaceWasPressed = false;
+let shiftWasPressed = false;
 let fastMode = false;
 let hardDropHappened = false;
 
@@ -23,7 +25,6 @@ export default function Tetris() {
     const [pieceQueue, setPieceQueue] = useState<Piece[]>(shuffle([1, 2, 3, 4, 5, 6, 7]));
     const [gameOver, setGameOver] = useState(false);
     const [score, setScore] = useState(0);
-    const [holdingPiece, setHoldingPiece] = useState<Piece>(0);
 
     const renderFrame = () => {
         setBoard(currentBoard);
@@ -34,6 +35,7 @@ export default function Tetris() {
     useEffect(() => {
         // handle the key being down
         const keyPressHandler = (event: KeyboardEvent) => {
+            if (currentPiece === null) return;
             let code = event.key;
             if (hardDropHappened) return;
             // if down arrow is pressed, keep going down
@@ -60,7 +62,6 @@ export default function Tetris() {
                 moveLeft();
             }
             if (code === " " && !spaceWasPressed) {
-                if (currentPiece === null) return;
                 hardDropHappened = true;
                 spaceWasPressed = true;
                 let tmp = currentPiece.hardDrop(currentBoard, currentInPlace);
@@ -68,6 +69,18 @@ export default function Tetris() {
                 currentBoard = tmp.board;
                 currentInPlace = tmp.inPlace;
                 renderFrame();
+            }
+            if (code === "Shift" && !shiftWasPressed) {
+                shiftWasPressed = true;
+                let tmp = holdingPiece;
+                holdingPiece = currentPiece.piece;
+                let res = currentPiece.render(currentBoard, currentInPlace, false, true);
+                currentBoard = res.board;
+                currentInPlace = res.inPlace;
+                if (tmp === Piece.None) dropNewPiece();
+                else dropNewPiece(tmp);
+                // renderFrame();
+
             }
         };
 
@@ -109,6 +122,7 @@ export default function Tetris() {
             // the current piece has landed, send a new piece
             if (!moveDown() || hardDropHappened) {
                 // checks if we lost
+                shiftWasPressed = false;
                 hardDropHappened = false;
                 for (let i = 0; i < WIDTH; i++) {
                     if (currentInPlace[i]) {
@@ -186,11 +200,13 @@ export default function Tetris() {
         }
     };
 
-    const dropNewPiece = () => {
-        const newPiece = pieceQueue.shift();
+    const dropNewPiece = (piece: Piece = Piece.None) => {
+        let newPiece: Piece | undefined = piece;
+        if (piece === Piece.None)
+            newPiece = pieceQueue.shift();
         if (newPiece === undefined) return;
         currentPiece = new TetrisPiece(newPiece, tick);
-        currentBoard = currentPiece.render(currentBoard, inPlace).board;
+        currentBoard = currentPiece.render(currentBoard, currentInPlace).board;
         setPieceQueue([...pieceQueue]);
         renderFrame();
     };
@@ -202,12 +218,14 @@ export default function Tetris() {
             </div>
             <div className="window">
                 <div className="gameBoard">
-                    {board.slice(0, 200).map((e, i) => <div className={`piece piece-${e} ${inPlace[i] ? "inPlace" : ""}`}></div>)}
+                    {board.slice(0, 200).map((e, i) => <div className={`box piece-${e} ${inPlace[i] ? "inPlace" : ""}`}></div>)}
                 </div>
                 <div className="extras">
-                    <h3>Hold</h3>
-                    <div className="upcomingField">
-                        {getPiece(holdingPiece, 0).flat().map(e => <div className={`piece ${e ? `piece-${holdingPiece}` : ""}`}></div>)}
+                    <div className="hold">
+                        <h3>Hold</h3>
+                        <div className="upcomingField">
+                            {getPiece(holdingPiece, 0).flat().map(e => <div className={`box ${e ? `piece piece-${holdingPiece}` : ""}`}></div>)}
+                        </div>
                     </div>
                     <div className="upcoming">
                         <h3>Upcoming</h3>
@@ -217,7 +235,7 @@ export default function Tetris() {
                                 let queueGrid = getPiece(pieceId, 0).flat();
                                 return (
                                     <div className="upcomingField">
-                                        {queueGrid.map(exists => <div className={`piece ${exists ? `piece-${pieceId}` : ""}`}></div>)}
+                                        {queueGrid.map(exists => <div className={`box ${exists ? `piece piece-${pieceId}` : ""}`}></div>)}
                                     </div>
                                 );
                             })
